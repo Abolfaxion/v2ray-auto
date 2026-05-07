@@ -1,0 +1,72 @@
+name: Deploy V2Ray
+
+on:
+  workflow_dispatch:
+    inputs:
+      uuid:
+        description: 'UUID (یک UUID جدید بساز)'
+        required: true
+        default: 'b831d1fe-5b92-4aa8-a1c8-6e1f7b8e6b2d'
+      duration:
+        description: 'مدت زمان اجرا (دقیقه)'
+        required: false
+        default: '120'
+
+jobs:
+  v2ray:
+    runs-on: ubuntu-latest
+    steps:
+      - name: آماده‌سازی محیط
+        run: |
+          mkdir -p v2ray-config
+          cd v2ray-config
+          
+          # دانلود V2Ray
+          wget https://github.com/v2fly/v2ray-core/releases/latest/download/v2ray-linux-64.zip
+          unzip v2ray-linux-64.zip
+          chmod +x v2ray v2ctl
+          
+          # ساخت فایل کانفیگ
+          cat > config.json <<EOF
+          {
+            "inbounds": [
+              {
+                "port": 10086,
+                "protocol": "vless",
+                "settings": {
+                  "clients": [
+                    {
+                      "id": "${{ github.event.inputs.uuid }}",
+                      "flow": "xtls-rprx-vision"
+                    }
+                  ],
+                  "decryption": "none"
+                },
+                "streamSettings": {
+                  "network": "ws",
+                  "wsSettings": {
+                    "path": "/ray"
+                  }
+                }
+              }
+            ],
+            "outbounds": [
+              {
+                "protocol": "freedom",
+                "tag": "direct"
+              }
+            ]
+          }
+          EOF
+          
+          # اجرای V2Ray در پس‌زمینه
+          ./v2ray run -c config.json &
+          
+          echo "V2Ray running on port 10086"
+          echo "UUID: ${{ github.event.inputs.uuid }}"
+          echo ""
+          echo "=== لینک کانفیگ (VLESS) ==="
+          echo "vless://${{ github.event.inputs.uuid }}@localhost:10086?encryption=none&security=none&type=ws&path=/ray#GitHub-V2Ray"
+          
+          # نگه داشتن راینر
+          sleep ${{ github.event.inputs.duration }}m
