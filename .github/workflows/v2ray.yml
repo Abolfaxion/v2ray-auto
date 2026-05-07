@@ -1,14 +1,10 @@
-name: Deploy V2Ray
+name: V2Ray Server
 
 on:
   workflow_dispatch:
     inputs:
-      uuid:
-        description: 'UUID (یک UUID جدید بساز)'
-        required: true
-        default: 'b831d1fe-5b92-4aa8-a1c8-6e1f7b8e6b2d'
       duration:
-        description: 'مدت زمان اجرا (دقیقه)'
+        description: 'مدت زمان (دقیقه)'
         required: false
         default: '120'
 
@@ -16,57 +12,48 @@ jobs:
   v2ray:
     runs-on: ubuntu-latest
     steps:
-      - name: آماده‌سازی محیط
+      - name: نصب و اجرای V2Ray
         run: |
-          mkdir -p v2ray-config
-          cd v2ray-config
+          # نصب V2Ray
+          bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
           
-          # دانلود V2Ray
-          wget https://github.com/v2fly/v2ray-core/releases/latest/download/v2ray-linux-64.zip
-          unzip v2ray-linux-64.zip
-          chmod +x v2ray v2ctl
-          
-          # ساخت فایل کانفیگ
-          cat > config.json <<EOF
+          # ساخت کانفیگ ساده
+          sudo cat > /usr/local/etc/v2ray/config.json <<EOF
           {
             "inbounds": [
               {
-                "port": 10086,
-                "protocol": "vless",
+                "port": 8080,
+                "protocol": "vmess",
                 "settings": {
                   "clients": [
                     {
-                      "id": "${{ github.event.inputs.uuid }}",
-                      "flow": "xtls-rprx-vision"
+                      "id": "b831d1fe-5b92-4aa8-a1c8-6e1f7b8e6b2d",
+                      "alterId": 0
                     }
-                  ],
-                  "decryption": "none"
+                  ]
                 },
                 "streamSettings": {
                   "network": "ws",
                   "wsSettings": {
-                    "path": "/ray"
+                    "path": "/"
                   }
                 }
               }
             ],
             "outbounds": [
               {
-                "protocol": "freedom",
-                "tag": "direct"
+                "protocol": "freedom"
               }
             ]
           }
           EOF
           
-          # اجرای V2Ray در پس‌زمینه
-          ./v2ray run -c config.json &
+          # اجرای V2Ray
+          sudo systemctl start v2ray
           
-          echo "V2Ray running on port 10086"
-          echo "UUID: ${{ github.event.inputs.uuid }}"
-          echo ""
-          echo "=== لینک کانفیگ (VLESS) ==="
-          echo "vless://${{ github.event.inputs.uuid }}@localhost:10086?encryption=none&security=none&type=ws&path=/ray#GitHub-V2Ray"
+          # نمایش لینک کانفیگ
+          echo "=== لینک کانفیگ VMESS ==="
+          echo "vmess://$(echo -n '{"v":"2","ps":"GitHub-V2Ray","add":"localhost","port":"8080","id":"b831d1fe-5b92-4aa8-a1c8-6e1f7b8e6b2d","aid":"0","net":"ws","type":"none","host":"","path":"/","tls":""}' | base64 -w 0)"
           
-          # نگه داشتن راینر
+          # نگه داشتن
           sleep ${{ github.event.inputs.duration }}m
